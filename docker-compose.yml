@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: ticketcore_postgres
+    environment:
+      POSTGRES_USER: ticketuser
+      POSTGRES_PASSWORD: ticketpass123
+      POSTGRES_DB: ticketcore_db
+    ports:
+      - "5433:5432" # Map container port 5432 to host port 5433
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ticketcore_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: ticketcore_redis
+    ports:
+      - "6380:6379" # Map container port 6379 to host port 6380
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - ticketcore_network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  ticketcore_network:
+    driver: bridge
