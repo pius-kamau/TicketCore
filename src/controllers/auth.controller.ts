@@ -3,6 +3,9 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { AppDataSource } from '../config/database';
 import { User, UserRole } from '../models/User';
+import { TokenService } from '../services/token.service';
+import { emailQueue } from '../config/queue';
+import logger from '../utils/logger';
 
 const userRepository = AppDataSource.getRepository(User);
 
@@ -11,16 +14,16 @@ export class AuthController {
     try {
       const { name, email, password, role } = req.body;
 
-      // Check if user exists
+      logger.info(`Registration attempt for email: ${email}`);
+
       const existingUser = await userRepository.findOne({ where: { email } });
       if (existingUser) {
+        logger.warn(`Registration failed - user already exists: ${email}`);
         return res.status(400).json({ message: 'User already exists' });
       }
 
-      // Hash password
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      // Create user
       const user = userRepository.create({
         name,
         email,
@@ -29,20 +32,31 @@ export class AuthController {
       });
 
       await userRepository.save(user);
+      logger.info(`User registered successfully: ${email} (ID: ${user.id})`);
 
-      // Generate token
-      const jwtSecret = process.env.JWT_SECRET || 'secret';
-      const jwtExpiresIn = process.env.JWT_EXPIRES_IN || '7d';
-      
-      const token = jwt.sign(
-        { userId: user.id, email: user.email, role: user.role },
-        jwtSecret,
-        { expiresIn: jwtExpiresIn } as jwt.SignOptions
+      // Add welcome email to queue
+      await emailQueue.add(`welcome-email-${user.id}`, {
+        type: 'welcome',
+        data: {
+          userId: user.id,
+          name: user.name,
+          email: user.email
+        }
+      });
+      logger.info(`Welcome email queued for user ${user.id}`);
+
+      // Generate tokens
+      const accessToken = TokenService.generateAccessToken(user);
+      const refreshToken = await TokenService.generateRefreshToken(
+        user,
+        req.ip,
+        req.headers['user-agent']
       );
 
       res.status(201).json({
         message: 'User registered successfully',
-        token,
+        accessToken,
+        refreshToken: refreshToken.token,
         user: {
           id: user.id,
           name: user.name,
@@ -51,7 +65,7 @@ export class AuthController {
         }
       });
     } catch (error) {
-      console.error(error);
+      logger.error(`Registration error: ${error}`);
       res.status(500).json({ message: 'Server error' });
     }
   }
@@ -60,31 +74,34 @@ export class AuthController {
     try {
       const { email, password } = req.body;
 
-      // Find user
+      logger.info(`Login attempt for email: ${email}`);
+
       const user = await userRepository.findOne({ where: { email } });
       if (!user) {
+        logger.warn(`Login failed - user not found: ${email}`);
         return res.status(401).json({ message: 'Invalid credentials' });
       }
 
-      // Check password
       const isValidPassword = await bcrypt.compare(password, user.password);
       if (!isValidPassword) {
+        logger.warn(`Login failed - invalid password for email: ${email}`);
         return res.status(401).json({ message: 'Invalid credentials' });
       }
 
-      // Generate token
-      const jwtSecret = process.env.JWT_SECRET || 'secret';
-      const jwtExpiresIn = process.env.JWT_EXPIRES_IN || '7d';
-      
-      const token = jwt.sign(
-        { userId: user.id, email: user.email, role: user.role },
-        jwtSecret,
-        { expiresIn: jwtExpiresIn } as jwt.SignOptions
+      // Generate tokens
+      const accessToken = TokenService.generateAccessToken(user);
+      const refreshToken = await TokenService.generateRefreshToken(
+        user,
+        req.ip,
+        req.headers['user-agent']
       );
+
+      logger.info(`User logged in successfully: ${email} (ID: ${user.id})`);
 
       res.json({
         message: 'Login successful',
-        token,
+        accessToken,
+        refreshToken: refreshToken.token,
         user: {
           id: user.id,
           name: user.name,
@@ -93,25 +110,107 @@ export class AuthController {
         }
       });
     } catch (error) {
-      console.error(error);
+      logger.error(`Login error: ${error}`);
+      res.status(500).json({ message: 'Server error' });
+    }
+  }
+
+  static async refreshToken(req: Request, res: Response) {
+    try {
+      const { refreshToken } = req.body;
+
+      if (!refreshToken) {
+        return res.status(400).json({ message: 'Refresh token required' });
+      }
+
+      // Verify refresh token
+      const verification = await TokenService.verifyRefreshToken(refreshToken);
+      
+      if (!verification.valid) {
+        return res.status(401).json({ message: verification.message || 'Invalid refresh token' });
+      }
+
+      // Get user
+      const user = await TokenService.getUserFromRefreshToken(refreshToken);
+      
+      if (!user) {
+        return res.status(401).json({ message: 'User not found' });
+      }
+
+      // Generate new access token
+      const newAccessToken = TokenService.generateAccessToken(user);
+      
+      // Optional: Rotate refresh token (generate new one)
+      const newRefreshToken = await TokenService.generateRefreshToken(
+        user,
+        req.ip,
+        req.headers['user-agent']
+      );
+      
+      // Revoke the old refresh token
+      await TokenService.revokeRefreshToken(refreshToken);
+
+      logger.info(`Tokens refreshed for user ${user.id}`);
+
+      res.json({
+        message: 'Tokens refreshed successfully',
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken.token
+      });
+    } catch (error) {
+      logger.error(`Refresh token error: ${error}`);
+      res.status(500).json({ message: 'Server error' });
+    }
+  }
+
+  static async logout(req: any, res: Response) {
+    try {
+      const { refreshToken } = req.body;
+
+      if (refreshToken) {
+        await TokenService.revokeRefreshToken(refreshToken);
+      }
+
+      logger.info(`User ${req.userId} logged out`);
+      res.json({ message: 'Logged out successfully' });
+    } catch (error) {
+      logger.error(`Logout error: ${error}`);
+      res.status(500).json({ message: 'Server error' });
+    }
+  }
+
+  static async logoutAllDevices(req: any, res: Response) {
+    try {
+      const userId = req.userId;
+      const count = await TokenService.revokeAllUserTokens(userId);
+
+      logger.info(`User ${userId} logged out from all devices, ${count} tokens revoked`);
+      res.json({ message: `Logged out from all devices (${count} sessions terminated)` });
+    } catch (error) {
+      logger.error(`Logout all devices error: ${error}`);
       res.status(500).json({ message: 'Server error' });
     }
   }
 
   static async getProfile(req: any, res: Response) {
     try {
+      const userId = req.userId;
+      logger.debug(`Fetching profile for user ID: ${userId}`);
+
       const user = await userRepository.findOne({
-        where: { id: req.userId },
+        where: { id: userId },
         select: ['id', 'name', 'email', 'role', 'createdAt']
       });
 
       if (!user) {
+        logger.warn(`Profile not found for user ID: ${userId}`);
         return res.status(404).json({ message: 'User not found' });
       }
 
+      logger.debug(`Profile retrieved for user: ${user.email}`);
       res.json(user);
     } catch (error) {
-      console.error(error);
+      logger.error(`Get profile error: ${error}`);
       res.status(500).json({ message: 'Server error' });
     }
   }

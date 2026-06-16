@@ -5,7 +5,9 @@ import { Event } from '../models/Event';
 import { Seat } from '../models/Seat';
 import { Reservation } from '../models/Reservation';
 import { Ticket } from '../models/Ticket';
-import { Payment } from '../models/Payment';  // Add this import
+import { Payment } from '../models/Payment';
+import { Venue } from '../models/Venue';
+import { RefreshToken } from '../models/RefreshToken';
 
 dotenv.config();
 
@@ -16,7 +18,8 @@ export const AppDataSource = new DataSource({
   username: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || 'postgres',
   database: process.env.DB_NAME || 'ticketcore_db',
-  synchronize: true,
-  logging: true,
-  entities: [User, Event, Seat, Reservation, Ticket, Payment],  // Add Payment here
+  synchronize: process.env.NODE_ENV !== 'production',
+  logging: process.env.NODE_ENV === 'development',
+  entities: [User, Event, Seat, Reservation, Ticket, Payment, Venue, RefreshToken],
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
 });

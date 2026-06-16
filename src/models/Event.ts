@@ -1,19 +1,23 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
 import { Seat } from './Seat';
+import { Venue } from './Venue';
 
 @Entity('events')
 export class Event {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ length: 200 })
+  @Column({ type: 'varchar', length: 200 })
   title: string;
 
-  @Column({ length: 500 })
+  @Column({ type: 'varchar', length: 500 })
   description: string;
 
-  @Column({ length: 200 })
-  location: string;
+  @Column({ type: 'varchar', length: 200, nullable: true })
+  location: string | null;
+
+  @Column({ type: 'int', name: 'venue_id', nullable: true })
+  venueId: number | null;
 
   @Column({ type: 'timestamp' })
   date: Date;
@@ -21,15 +25,19 @@ export class Event {
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   price: number;
 
-  @Column({ default: true })
+  @Column({ type: 'boolean', default: true })
   isActive: boolean;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ type: 'timestamp', name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ type: 'timestamp', name: 'updated_at' })
   updatedAt: Date;
 
-  @OneToMany(() => Seat, seat => seat.event)
+  @OneToMany(() => Seat, (seat) => seat.event)
   seats: Seat[];
+
+  @ManyToOne(() => Venue, (venue) => venue.events)
+  @JoinColumn({ name: 'venue_id' })
+  venue: Venue | null;
 }

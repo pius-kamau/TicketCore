@@ -1,15 +1,18 @@
 import { Router } from 'express';
 import { PaymentController } from '../controllers/payment.controller';
 import { authenticate } from '../middlewares/auth.middleware';
+import { validate } from '../middlewares/validate.middleware';
+import { mpesaPaymentSchema } from '../validators/reservation.validator';
 
 const router = Router();
 
-// IMPORTANT: This callback MUST be public (no auth)
+// Public callback endpoint (Safaricom calls this)
 router.post('/mpesa-callback', PaymentController.mpesaCallback);
 
 // Protected routes
-router.post('/mpesa/initiate', authenticate, PaymentController.initiateMpesaPayment);
-router.get('/status/:paymentId', authenticate, PaymentController.checkPaymentStatus);
-router.get('/my-payments', authenticate, PaymentController.getUserPayments);
+router.use(authenticate);
+router.post('/mpesa/initiate', validate(mpesaPaymentSchema), PaymentController.initiateMpesaPayment);
+router.get('/status/:paymentId', PaymentController.checkPaymentStatus);
+router.get('/my-payments', PaymentController.getUserPayments);
 
 export default router;

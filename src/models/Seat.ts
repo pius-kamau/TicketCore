@@ -32,6 +32,15 @@ export class Seat {
   @Column({ nullable: true })
   section: string;
 
+  @Column({ nullable: true, type: 'int' })
+  column: number;  // Added: column position for seat map
+
+  @Column({ nullable: true, type: 'int' })
+  rowIndex: number;  // Added: row index for ordering
+
+  @Column({ nullable: true })
+  priceMultiplier: number;  // Added: VIP or premium seating
+
   @ManyToOne(() => Event, event => event.seats)
   @JoinColumn({ name: 'event_id' })
   event: Event;

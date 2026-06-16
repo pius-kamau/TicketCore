@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
 import { Reservation } from './Reservation';
 import { Ticket } from './Ticket';
+import { RefreshToken } from './RefreshToken';
 
 export enum UserRole {
   CUSTOMER = 'customer',
@@ -39,4 +40,7 @@ export class User {
 
   @OneToMany(() => Ticket, ticket => ticket.user)
   tickets: Ticket[];
+
+  @OneToMany(() => RefreshToken, refreshToken => refreshToken.user)
+  refreshTokens: RefreshToken[];
 }

@@ -3,14 +3,18 @@ import { AppDataSource } from '../config/database';
 import { Reservation, ReservationStatus } from '../models/Reservation';
 import { Seat, SeatStatus } from '../models/Seat';
 import { Ticket } from '../models/Ticket';
-import { Event } from '../models/Event';  // Add this import
+import { Event } from '../models/Event';
 import redisClient from '../config/redis';
 import { v4 as uuidv4 } from 'uuid';
+import { broadcastSeatUpdate } from '../socket';
+import { reservationExpiryQueue, ticketQueue } from '../config/queue';
+import { QRCodeService } from '../services/qrcode.service';
+import logger from '../utils/logger';
 
 const reservationRepository = AppDataSource.getRepository(Reservation);
 const seatRepository = AppDataSource.getRepository(Seat);
 const ticketRepository = AppDataSource.getRepository(Ticket);
-const eventRepository = AppDataSource.getRepository(Event);  // Add this
+const eventRepository = AppDataSource.getRepository(Event);
 
 const SEAT_LOCK_DURATION = parseInt(process.env.SEAT_LOCK_DURATION_SECONDS || '600');
 
@@ -67,13 +71,32 @@ export class ReservationController {
       // Store lock in Redis with TTL
       await redisClient.setEx(lockKey, SEAT_LOCK_DURATION, reservation.id.toString());
 
+      // Add reservation expiry job to BullMQ queue (10 minutes delay)
+      await reservationExpiryQueue.add('expire', {
+        reservationId: reservation.id,
+        seatId: seat.id,
+        eventId: eventId,
+        userId: userId,
+      });
+
+      logger.info(`Reservation ${reservation.id} created. Expiry job queued`);
+
+      // Broadcast real-time seat update to all connected clients
+      broadcastSeatUpdate(eventId, {
+        eventId: eventId,
+        seatId: seat.id,
+        seatNumber: seat.seatNumber,
+        status: SeatStatus.HELD,
+        userId: userId
+      });
+
       res.status(201).json({
         message: 'Seat held successfully',
         reservationId: reservation.id,
         expiresAt
       });
     } catch (error) {
-      console.error(error);
+      logger.error(`Hold seat error: ${error}`);
       res.status(500).json({ message: 'Server error' });
     }
   }
@@ -125,9 +148,34 @@ export class ReservationController {
 
       await ticketRepository.save(ticket);
 
+      // Generate QR code for ticket
+      const qrCodeDataUrl = await QRCodeService.generateQRCode(ticket);
+      ticket.qrCode = qrCodeDataUrl;
+      await ticketRepository.save(ticket);
+      logger.info(`QR Code generated for ticket ${ticketCode}`);
+
       // Remove Redis lock
       const lockKey = `seat_lock:${seat.eventId}:${seat.id}`;
       await redisClient.del(lockKey);
+
+      // Add ticket processing job to queue (for email, etc.)
+      await ticketQueue.add('ticket', {
+        ticketId: ticket.id,
+        userId: userId,
+        reservationId: reservation.id,
+        ticketCode: ticketCode,
+      });
+
+      logger.info(`Ticket ${ticketCode} generated. Ticket job queued`);
+
+      // Broadcast real-time seat update to all connected clients
+      broadcastSeatUpdate(seat.eventId, {
+        eventId: seat.eventId,
+        seatId: seat.id,
+        seatNumber: seat.seatNumber,
+        status: SeatStatus.BOOKED,
+        userId: userId
+      });
 
       res.json({
         message: 'Booking confirmed successfully',
@@ -136,11 +184,12 @@ export class ReservationController {
           ticketCode: ticket.ticketCode,
           event: seat.event.title,
           seatNumber: seat.seatNumber,
-          price: ticket.price
+          price: ticket.price,
+          qrCode: ticket.qrCode
         }
       });
     } catch (error) {
-      console.error(error);
+      logger.error(`Confirm booking error: ${error}`);
       res.status(500).json({ message: 'Server error' });
     }
   }
@@ -157,7 +206,7 @@ export class ReservationController {
 
       res.json(reservations);
     } catch (error) {
-      console.error(error);
+      logger.error(`Get user reservations error: ${error}`);
       res.status(500).json({ message: 'Server error' });
     }
   }
@@ -181,10 +230,11 @@ export class ReservationController {
         seatNumber: ticket.seatNumber,
         price: ticket.price,
         isUsed: ticket.isUsed,
-        issuedAt: ticket.issuedAt
+        issuedAt: ticket.issuedAt,
+        hasQrCode: !!ticket.qrCode
       })));
     } catch (error) {
-      console.error(error);
+      logger.error(`Get user tickets error: ${error}`);
       res.status(500).json({ message: 'Server error' });
     }
   }
@@ -221,9 +271,20 @@ export class ReservationController {
       const lockKey = `seat_lock:${seat.eventId}:${seat.id}`;
       await redisClient.del(lockKey);
 
+      // Broadcast real-time seat update to all connected clients
+      broadcastSeatUpdate(seat.eventId, {
+        eventId: seat.eventId,
+        seatId: seat.id,
+        seatNumber: seat.seatNumber,
+        status: SeatStatus.AVAILABLE,
+        userId: undefined
+      });
+
+      logger.info(`Reservation ${reservationId} cancelled. Seat released`);
+
       res.json({ message: 'Reservation cancelled successfully' });
     } catch (error) {
-      console.error(error);
+      logger.error(`Cancel reservation error: ${error}`);
       res.status(500).json({ message: 'Server error' });
     }
   }

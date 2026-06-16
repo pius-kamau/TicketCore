@@ -1,0 +1,71 @@
+services:
+  - type: web
+    name: ticketcore-api
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DB_HOST
+        fromDatabase:
+          name: ticketcore-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: ticketcore-db
+          property: port
+      - key: DB_USER
+        fromDatabase:
+          name: ticketcore-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: ticketcore-db
+          property: password
+      - key: DB_NAME
+        fromDatabase:
+          name: ticketcore-db
+          property: database
+      - key: REDIS_URL
+        fromService:
+          type: pserv
+          name: ticketcore-redis
+          property: host
+          with: redis://:6379
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 15m
+      - key: SEAT_LOCK_DURATION_SECONDS
+        value: 600
+      - key: MPESA_ENV
+        value: production
+      - key: MPESA_CONSUMER_KEY
+        sync: false
+      - key: MPESA_CONSUMER_SECRET
+        sync: false
+      - key: MPESA_SHORTCODE
+        sync: false
+      - key: MPESA_PASSKEY
+        sync: false
+      - key: APP_URL
+        fromService:
+          type: web
+          name: ticketcore-api
+          property: host
+          with: https://
+
+  - type: redis
+    name: ticketcore-redis
+    plan: free
+    maxmemoryPolicy: noeviction
+
+databases:
+  - name: ticketcore-db
+    plan: free
+    databaseName: ticketcore_db
+    user: ticketuser

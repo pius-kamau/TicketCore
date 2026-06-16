@@ -6,6 +6,9 @@ import { Seat, SeatStatus } from '../models/Seat';
 import { Ticket } from '../models/Ticket';
 import { stkPush } from '../config/mpesa';
 import { v4 as uuidv4 } from 'uuid';
+import { ticketQueue } from '../config/queue';
+import { QRCodeService } from '../services/qrcode.service';
+import logger from '../utils/logger';
 
 const paymentRepository = AppDataSource.getRepository(Payment);
 const reservationRepository = AppDataSource.getRepository(Reservation);
@@ -18,6 +21,8 @@ export class PaymentController {
       const { reservationId, phoneNumber } = req.body;
       const userId = req.userId;
 
+      logger.info(`Initiating M-Pesa payment for reservation ${reservationId}, user ${userId}`);
+
       // Find reservation
       const reservation = await reservationRepository.findOne({
         where: { id: reservationId, userId },
@@ -25,10 +30,12 @@ export class PaymentController {
       });
 
       if (!reservation) {
+        logger.warn(`Reservation ${reservationId} not found for user ${userId}`);
         return res.status(404).json({ message: 'Reservation not found' });
       }
 
       if (reservation.status !== ReservationStatus.PENDING) {
+        logger.warn(`Reservation ${reservationId} status is ${reservation.status}, not PENDING`);
         return res.status(400).json({ message: 'Reservation already processed' });
       }
 
@@ -39,6 +46,8 @@ export class PaymentController {
       }
 
       const amount = reservation.seat.event.price;
+      
+      logger.info(`Initiating STK Push for ${formattedPhone}, amount ${amount}`);
       
       // Initiate STK Push
       const mpesaResponse = await stkPush(
@@ -61,78 +70,123 @@ export class PaymentController {
         
         await paymentRepository.save(payment);
         
+        logger.info(`Payment record created for reservation ${reservationId}, Checkout ID: ${mpesaResponse.CheckoutRequestID}`);
+        
         res.json({
           success: true,
           message: 'STK Push sent. Check your phone.',
-          checkoutRequestId: mpesaResponse.CheckoutRequestID
+          checkoutRequestId: mpesaResponse.CheckoutRequestID,
+          paymentId: payment.id
         });
       } else {
+        logger.error(`STK Push failed: ${mpesaResponse.ResponseDescription}`);
         res.status(400).json({
           success: false,
           message: mpesaResponse.ResponseDescription
         });
       }
     } catch (error) {
-      console.error(error);
+      logger.error(`Initiate M-Pesa payment error: ${error}`);
       res.status(500).json({ message: 'Server error' });
     }
   }
 
   static async mpesaCallback(req: Request, res: Response) {
     try {
-      console.log('M-Pesa Callback received:', JSON.stringify(req.body, null, 2));
+      logger.info('M-Pesa Callback received');
       
       const { Body } = req.body;
       
       if (Body && Body.stkCallback) {
         const { CheckoutRequestID, ResultCode, ResultDesc, CallbackMetadata } = Body.stkCallback;
         
+        logger.info(`Callback for Checkout ID: ${CheckoutRequestID}, ResultCode: ${ResultCode}`);
+        
         // Find payment
         const payment = await paymentRepository.findOne({
           where: { mpesaCheckoutId: CheckoutRequestID },
-          relations: ['reservation', 'reservation.seat']
+          relations: ['reservation', 'reservation.seat', 'reservation.seat.event']
         });
         
         if (payment) {
           if (ResultCode === 0) {
             // Payment successful
             payment.status = PaymentStatus.COMPLETED;
+            
+            // Extract receipt number from metadata
+            if (CallbackMetadata && CallbackMetadata.Item) {
+              const receiptItem = CallbackMetadata.Item.find((item: any) => item.Name === 'MpesaReceiptNumber');
+              if (receiptItem) {
+                payment.mpesaReceiptNumber = receiptItem.Value;
+                logger.info(`Receipt number: ${receiptItem.Value}`);
+              }
+            }
+            
             await paymentRepository.save(payment);
+            logger.info(`Payment ${payment.id} completed successfully`);
             
             // Update reservation
             const reservation = payment.reservation;
-            reservation.status = ReservationStatus.CONFIRMED;
-            await reservationRepository.save(reservation);
+            if (reservation) {
+              reservation.status = ReservationStatus.CONFIRMED;
+              await reservationRepository.save(reservation);
+              logger.info(`Reservation ${reservation.id} confirmed`);
+            }
             
             // Update seat
-            const seat = reservation.seat;
-            seat.status = SeatStatus.BOOKED;
-            await seatRepository.save(seat);
+            const seat = reservation?.seat;
+            if (seat) {
+              seat.status = SeatStatus.BOOKED;
+              await seatRepository.save(seat);
+              logger.info(`Seat ${seat.id} (${seat.seatNumber}) booked`);
+            }
             
             // Generate ticket
             const ticket = new Ticket();
             ticket.ticketCode = uuidv4();
             ticket.userId = payment.userId;
-            ticket.reservationId = reservation.id;
-            ticket.eventId = seat.eventId;
-            ticket.seatNumber = seat.seatNumber;
+            ticket.reservationId = payment.reservationId;
+            ticket.eventId = seat?.eventId || 0;
+            ticket.seatNumber = seat?.seatNumber || '';
             ticket.price = payment.amount;
             ticket.isUsed = false;
             
             await ticketRepository.save(ticket);
+            logger.info(`Ticket generated: ${ticket.ticketCode}`);
             
-            console.log(`Payment successful for reservation ${reservation.id}`);
+            // Generate QR code for ticket
+            const qrCodeDataUrl = await QRCodeService.generateQRCode(ticket);
+            ticket.qrCode = qrCodeDataUrl;
+            await ticketRepository.save(ticket);
+            logger.info(`QR Code generated for ticket ${ticket.ticketCode}`);
+            
+            // Add ONLY ticket processing job to queue (this will trigger the email)
+            await ticketQueue.add('ticket', {
+              ticketId: ticket.id,
+              userId: payment.userId,
+              reservationId: payment.reservationId,
+              ticketCode: ticket.ticketCode,
+            });
+            logger.info(`Ticket job queued for ticket ${ticket.ticketCode}`);
+            
+            // REMOVED duplicate email sends - ticket worker handles email
+            // No separate emailQueue.add calls here
+            
           } else {
             payment.status = PaymentStatus.FAILED;
             await paymentRepository.save(payment);
-            console.log(`Payment failed: ${ResultDesc}`);
+            logger.warn(`Payment failed: ${ResultDesc}`);
           }
+        } else {
+          logger.warn(`Payment not found for Checkout ID: ${CheckoutRequestID}`);
         }
+      } else {
+        logger.warn('Invalid callback structure received');
       }
       
       res.json({ ResultCode: 0, ResultDesc: 'Success' });
     } catch (error) {
-      console.error('Callback error:', error);
+      logger.error(`M-Pesa callback error: ${error}`);
       res.json({ ResultCode: 1, ResultDesc: 'Failed' });
     }
   }
@@ -141,11 +195,17 @@ export class PaymentController {
     try {
       const { paymentId } = req.params;
       const payment = await paymentRepository.findOne({
-        where: { id: parseInt(paymentId), userId: req.userId }
+        where: { id: parseInt(paymentId), userId: req.userId },
+        relations: ['reservation', 'reservation.seat', 'reservation.seat.event']
       });
+      
+      if (!payment) {
+        return res.status(404).json({ message: 'Payment not found' });
+      }
       
       res.json(payment);
     } catch (error) {
+      logger.error(`Check payment status error: ${error}`);
       res.status(500).json({ message: 'Server error' });
     }
   }
@@ -154,11 +214,13 @@ export class PaymentController {
     try {
       const payments = await paymentRepository.find({
         where: { userId: req.userId },
-        relations: ['reservation', 'reservation.seat', 'reservation.seat.event']
+        relations: ['reservation', 'reservation.seat', 'reservation.seat.event'],
+        order: { createdAt: 'DESC' }
       });
       
       res.json(payments);
     } catch (error) {
+      logger.error(`Get user payments error: ${error}`);
       res.status(500).json({ message: 'Server error' });
     }
   }

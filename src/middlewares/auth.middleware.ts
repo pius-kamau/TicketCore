@@ -7,7 +7,8 @@ export interface AuthRequest extends Request {
 }
 
 export const authenticate = (req: AuthRequest, res: Response, next: NextFunction) => {
-  const token = req.headers.authorization?.split(' ')[1];
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.split(' ')[1];
 
   if (!token) {
     return res.status(401).json({ message: 'Access denied. No token provided.' });
@@ -20,6 +21,9 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
     req.userRole = decoded.role;
     next();
   } catch (error) {
+    if (error instanceof jwt.TokenExpiredError) {
+      return res.status(401).json({ message: 'Token expired. Please refresh.' });
+    }
     return res.status(401).json({ message: 'Invalid token.' });
   }
 };

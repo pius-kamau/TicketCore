@@ -7,7 +7,8 @@ const router = Router();
 // Public routes
 router.get('/', EventController.getAllEvents);
 router.get('/:id', EventController.getEventById);
-router.get('/:id/seats', EventController.getSeatLayout);  // New route
+router.get('/:id/seats', EventController.getSeatLayout);
+router.get('/:id/seats/matrix', EventController.getSeatMatrix);
 
 // Admin only routes
 router.post('/', authenticate, isAdmin, EventController.createEvent);
