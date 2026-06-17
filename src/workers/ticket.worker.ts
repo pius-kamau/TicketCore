@@ -17,7 +17,6 @@ export const processTicketJob = async (job: Job) => {
   });
   
   if (ticket) {
-    // Add ticket confirmation email (only one email)
     await emailQueue.add('ticket-confirmation', {
       type: 'ticket-confirmation',
       data: {
@@ -36,20 +35,16 @@ export const processTicketJob = async (job: Job) => {
   return { success: true };
 };
 
-// Register processor only once - remove duplicate
-ticketQueue.process('ticket', async (job) => {
+// Register processor only once
+ticketQueue.process('ticket', async (job: Job) => {
   return processTicketJob(job);
 });
 
-// Remove the generic processor - it was causing the duplicate
-// ticketQueue.process(async (job) => {
-//   return processTicketJob(job);
-// });
-
-ticketQueue.on('completed', (job) => {
+// Event listeners with proper types
+ticketQueue.on('completed', (job: Job) => {
   logger.info(`Ticket job ${job.id} completed`);
 });
 
-ticketQueue.on('failed', (job, err) => {
+ticketQueue.on('failed', (job: Job | undefined, err: Error) => {
   logger.error(`Ticket job ${job?.id} failed: ${err.message}`);
 });

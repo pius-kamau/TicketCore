@@ -7,7 +7,6 @@ let redisClient: any = null;
 
 if (redisUrl) {
   try {
-    // Check if it's a secure URL (rediss://) or needs TLS
     const isSecure = redisUrl.startsWith('rediss://');
     
     redisClient = createClient({
@@ -18,12 +17,12 @@ if (redisUrl) {
       },
     });
 
-    redisClient.on('error', (err) => {
+    redisClient.on('error', (err: Error) => {
       console.error('Redis Client Error:', err.message);
     });
     
-    redisClient.on('connect', () => console.log(' Redis connected successfully'));
-    redisClient.on('ready', () => console.log(' Redis ready for commands'));
+    redisClient.on('connect', () => console.log('✅ Redis connected successfully'));
+    redisClient.on('ready', () => console.log('✅ Redis ready for commands'));
     redisClient.on('end', () => console.log('Redis connection closed'));
     
     logger.info('Redis client initialized');
@@ -31,7 +30,7 @@ if (redisUrl) {
     logger.error('Failed to initialize Redis:', error);
   }
 } else {
-  logger.warn(' Redis not configured. Running without Redis.');
+  logger.warn('⚠️ Redis not configured. Running without Redis.');
 }
 
 export default redisClient;

@@ -71,18 +71,20 @@ export const processEmailJob = async (job: Job) => {
   return { success: false, error: 'No email content generated' };
 };
 
-emailQueue.process('welcome', async (job) => {
+// Register processors
+emailQueue.process('welcome', async (job: Job) => {
   return processEmailJob(job);
 });
 
-emailQueue.process('ticket-confirmation', async (job) => {
+emailQueue.process('ticket-confirmation', async (job: Job) => {
   return processEmailJob(job);
 });
 
-emailQueue.on('completed', (job) => {
+// Event listeners with proper types
+emailQueue.on('completed', (job: Job) => {
   logger.info(`Email job ${job.id} completed`);
 });
 
-emailQueue.on('failed', (job, err) => {
+emailQueue.on('failed', (job: Job | undefined, err: Error) => {
   logger.error(`Email job ${job?.id} failed: ${err.message}`);
 });

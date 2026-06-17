@@ -43,19 +43,15 @@ export const processReservationExpiry = async (job: Job) => {
 };
 
 // Register processor only once
-reservationExpiryQueue.process('expire', async (job) => {
+reservationExpiryQueue.process('expire', async (job: Job) => {
   return processReservationExpiry(job);
 });
 
-// Remove duplicate generic processor
-// reservationExpiryQueue.process(async (job) => {
-//   return processReservationExpiry(job);
-// });
-
-reservationExpiryQueue.on('completed', (job) => {
+// Event listeners with proper types
+reservationExpiryQueue.on('completed', (job: Job) => {
   logger.info(`Reservation expiry job ${job.id} completed`);
 });
 
-reservationExpiryQueue.on('failed', (job, err) => {
+reservationExpiryQueue.on('failed', (job: Job | undefined, err: Error) => {
   logger.error(`Reservation expiry job ${job?.id} failed: ${err.message}`);
 });
