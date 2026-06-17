@@ -3,54 +3,78 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Redis connection URL
-const redisUrl = `redis://${process.env.REDIS_HOST || 'localhost'}:${parseInt(process.env.REDIS_PORT || '6379')}`;
+const redisUrl = process.env.REDIS_URL;
 
-// Job Queues
-export const emailQueue = new Queue('email-queue', redisUrl, {
-  defaultJobOptions: {
-    attempts: 3,
-    backoff: {
-      type: 'exponential',
-      delay: 5000,
-    },
-    removeOnComplete: 100,
-    removeOnFail: 500,
-  },
+// Create dummy queues if Redis is not available
+const createDummyQueue = () => ({
+  add: async () => ({ id: 'dummy' }),
+  process: () => {},
+  on: () => {},
+  getWaitingCount: async () => 0,
+  getActiveCount: async () => 0,
+  getCompletedCount: async () => 0,
+  getFailedCount: async () => 0,
+  getFailed: async () => [],
+  getJob: async () => null,
+  clean: async () => [],
 });
 
-export const reservationExpiryQueue = new Queue('reservation-expiry-queue', redisUrl, {
-  defaultJobOptions: {
-    delay: 10 * 60 * 1000, // 10 minutes delay
-    removeOnComplete: true,
-    removeOnFail: true,
-  },
-});
+let emailQueue: any;
+let reservationExpiryQueue: any;
+let ticketQueue: any;
+let notificationQueue: any;
 
-export const ticketQueue = new Queue('ticket-queue', redisUrl, {
-  defaultJobOptions: {
-    attempts: 3,
-    backoff: 5000,
-    removeOnComplete: true,
-  },
-});
+if (redisUrl) {
+  try {
+    // BullMQ uses ioredis, which needs TLS config
+    const queueOptions = {
+      redis: {
+        host: 'perfect-haddock-122987.upstash.io',
+        port: 6379,
+        password: 'gQAAAAAAAeBrAAIgcDEyNjQxMmYxNzZlYWE0ODYyOTBmMDExOWE5MzNjNjJmMA',
+        tls: {
+          rejectUnauthorized: false,
+        },
+      },
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+        removeOnComplete: 100,
+        removeOnFail: 500,
+      },
+    };
 
-export const notificationQueue = new Queue('notification-queue', redisUrl, {
-  defaultJobOptions: {
-    attempts: 3,
-    backoff: 5000,
-  },
-});
+    emailQueue = new Queue('email-queue', queueOptions);
+    reservationExpiryQueue = new Queue('reservation-expiry-queue', {
+      ...queueOptions,
+      defaultJobOptions: {
+        delay: 10 * 60 * 1000,
+        removeOnComplete: true,
+        removeOnFail: true,
+      },
+    });
+    ticketQueue = new Queue('ticket-queue', queueOptions);
+    notificationQueue = new Queue('notification-queue', queueOptions);
 
-// Queue event listeners
-emailQueue.on('error', (error) => {
-  console.error('Email queue error:', error);
-});
+    console.log(' BullMQ queues initialized with Upstash Redis (TLS)');
+  } catch (error) {
+    console.log(' BullMQ initialization failed, using dummy queues');
+    emailQueue = createDummyQueue();
+    reservationExpiryQueue = createDummyQueue();
+    ticketQueue = createDummyQueue();
+    notificationQueue = createDummyQueue();
+  }
+} else {
+  emailQueue = createDummyQueue();
+  reservationExpiryQueue = createDummyQueue();
+  ticketQueue = createDummyQueue();
+  notificationQueue = createDummyQueue();
+  console.log(' BullMQ running in dummy mode (no Redis)');
+}
 
-reservationExpiryQueue.on('error', (error) => {
-  console.error('Reservation expiry queue error:', error);
-});
-
-ticketQueue.on('error', (error) => {
-  console.error('Ticket queue error:', error);
-});
+export {
+  emailQueue,
+  reservationExpiryQueue,
+  ticketQueue,
+  notificationQueue,
+};
