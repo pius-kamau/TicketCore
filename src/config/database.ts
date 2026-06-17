@@ -18,7 +18,7 @@ export const AppDataSource = new DataSource({
   username: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || 'postgres',
   database: process.env.DB_NAME || 'ticketcore_db',
-  synchronize: process.env.NODE_ENV !== 'production',
+  synchronize: true,  // ✅ FORCE sync to create tables
   logging: process.env.NODE_ENV === 'development',
   entities: [User, Event, Seat, Reservation, Ticket, Payment, Venue, RefreshToken],
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
