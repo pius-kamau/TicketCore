@@ -34,8 +34,8 @@ export class AuthController {
       await userRepository.save(user);
       logger.info(`User registered successfully: ${email} (ID: ${user.id})`);
 
-      // Add welcome email to queue
-      await emailQueue.add(`welcome-email-${user.id}`, {
+      // Add welcome email to queue - use 'welcome' as the job name
+      await emailQueue.add('welcome', {
         type: 'welcome',
         data: {
           userId: user.id,
