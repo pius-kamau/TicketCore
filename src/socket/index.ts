@@ -15,7 +15,7 @@ export let io: SocketServer;
 export const initializeSocket = (server: HttpServer) => {
   io = new SocketServer(server, {
     cors: {
-      origin: '*', // Configure appropriately for production
+      origin: '*',
       methods: ['GET', 'POST'],
       credentials: true
     }
@@ -24,7 +24,6 @@ export const initializeSocket = (server: HttpServer) => {
   io.on('connection', (socket: Socket) => {
     logger.info(`New client connected: ${socket.id}`);
 
-    // Join event room for real-time updates
     socket.on('join-event', (eventId: number) => {
       socket.join(`event_${eventId}`);
       logger.info(`Socket ${socket.id} joined event_${eventId}`);
@@ -44,7 +43,6 @@ export const initializeSocket = (server: HttpServer) => {
   return io;
 };
 
-// Broadcast seat status change to all users viewing the event
 export const broadcastSeatUpdate = (eventId: number, seatData: SeatUpdateData) => {
   if (io) {
     io.to(`event_${eventId}`).emit('seat-update', {
@@ -55,7 +53,6 @@ export const broadcastSeatUpdate = (eventId: number, seatData: SeatUpdateData) =
   }
 };
 
-// Broadcast bulk seat updates
 export const broadcastBulkSeatUpdate = (eventId: number, seats: SeatUpdateData[]) => {
   if (io) {
     io.to(`event_${eventId}`).emit('bulk-seat-update', {

@@ -14,51 +14,42 @@ const paymentRepository = AppDataSource.getRepository(Payment);
 const userRepository = AppDataSource.getRepository(User);
 
 export class AnalyticsController {
-  // Main dashboard analytics
   static async getDashboardStats(req: Request, res: Response) {
     try {
-      // Revenue calculations
       const completedPayments = await paymentRepository.find({
         where: { status: PaymentStatus.COMPLETED }
       });
       
       const totalRevenue = completedPayments.reduce((sum, p) => sum + Number(p.amount), 0);
       
-      // Today's revenue
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const todayRevenue = completedPayments
         .filter(p => new Date(p.createdAt) >= today)
         .reduce((sum, p) => sum + Number(p.amount), 0);
       
-      // This month's revenue
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
       const monthRevenue = completedPayments
         .filter(p => new Date(p.createdAt) >= startOfMonth)
         .reduce((sum, p) => sum + Number(p.amount), 0);
       
-      // Ticket sales
       const totalTickets = await ticketRepository.count();
       const usedTickets = await ticketRepository.count({ where: { isUsed: true } });
       const unusedTickets = totalTickets - usedTickets;
       
-      // Events
       const totalEvents = await eventRepository.count();
       const upcomingEvents = await eventRepository.count({
         where: { date: new Date(), isActive: true }
       });
       
-      // Users
       const totalUsers = await userRepository.count();
       const adminUsers = await userRepository.count({ where: { role: UserRole.ADMIN } });
       const customerUsers = totalUsers - adminUsers;
       
-      // Reservations
       const activeReservations = await reservationRepository.count({
         where: { status: ReservationStatus.PENDING }
       });
       
-      // Occupancy rate (across all events)
       const allEvents = await eventRepository.find({ relations: ['seats'] });
       let totalSeats = 0;
       let bookedSeats = 0;
@@ -109,7 +100,6 @@ export class AnalyticsController {
     }
   }
   
-  // Revenue over time (daily/weekly/monthly)
   static async getRevenueReport(req: Request, res: Response) {
     try {
       const { period = 'monthly' } = req.query;
@@ -122,7 +112,6 @@ export class AnalyticsController {
       let revenueData = [];
       
       if (period === 'daily') {
-        // Group by day for last 30 days
         const last30Days = new Date();
         last30Days.setDate(last30Days.getDate() - 30);
         
@@ -145,7 +134,6 @@ export class AnalyticsController {
           .map(([date, amount]) => ({ date, amount }))
           .reverse();
       } else if (period === 'weekly') {
-        // Group by week
         const weeklyMap = new Map();
         for (const payment of completedPayments) {
           const weekNumber = getWeekNumber(payment.createdAt);
@@ -156,7 +144,6 @@ export class AnalyticsController {
         revenueData = Array.from(weeklyMap.entries())
           .map(([week, amount]) => ({ week, amount }));
       } else {
-        // Group by month
         const monthlyMap = new Map();
         for (const payment of completedPayments) {
           const monthKey = payment.createdAt.toISOString().slice(0, 7);
@@ -178,7 +165,6 @@ export class AnalyticsController {
     }
   }
   
-  // Popular events ranking
   static async getPopularEvents(req: Request, res: Response) {
     try {
       const events = await eventRepository.find({
@@ -204,7 +190,6 @@ export class AnalyticsController {
         });
       }
       
-      // Sort by tickets sold (most popular first)
       eventStats.sort((a, b) => b.ticketsSold - a.ticketsSold);
       
       res.json(eventStats);
@@ -214,7 +199,6 @@ export class AnalyticsController {
     }
   }
   
-  // Seat occupancy heatmap data
   static async getSeatOccupancy(req: Request, res: Response) {
     try {
       const { eventId } = req.params;
@@ -269,7 +253,6 @@ export class AnalyticsController {
     }
   }
   
-  // Sales by event
   static async getSalesByEvent(req: Request, res: Response) {
     try {
       const events = await eventRepository.find({
@@ -304,12 +287,10 @@ export class AnalyticsController {
     }
   }
   
-  // Real-time activity feed
   static async getRecentActivity(req: Request, res: Response) {
     try {
       const limit = parseInt(req.query.limit as string) || 20;
       
-      // Get recent payments
       const recentPayments = await paymentRepository.find({
         where: { status: PaymentStatus.COMPLETED },
         relations: ['user', 'reservation', 'reservation.seat'],
@@ -317,7 +298,6 @@ export class AnalyticsController {
         take: limit
       });
       
-      // Get recent ticket check-ins
       const recentCheckins = await ticketRepository.find({
         where: { isUsed: true },
         relations: ['user', 'event'],
@@ -350,7 +330,6 @@ export class AnalyticsController {
         });
       }
       
-      // Sort by timestamp descending
       activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       
       res.json(activities.slice(0, limit));
@@ -361,7 +340,6 @@ export class AnalyticsController {
   }
 }
 
-// Helper function for week numbers
 function getWeekNumber(date: Date): number {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);

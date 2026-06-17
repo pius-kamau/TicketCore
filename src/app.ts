@@ -20,16 +20,11 @@ dotenv.config();
 
 const app = express();
 
-// ✅ Trust proxy for rate limiting behind Render/nginx
 app.set('trust proxy', 1);
 
-// Logging middleware (first!)
 app.use(httpLogger);
-
-// Global rate limiter (apply to all routes)
 app.use(generalLimiter);
 
-// Helmet with relaxed CSP for development
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -48,14 +43,11 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static files from public directory
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Swagger documentation
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 logger.info('Swagger documentation available at /api-docs');
 
-// Welcome route at root
 app.get('/', (req, res) => {
   res.json({
     message: 'Welcome to TicketCore API',
@@ -75,7 +67,6 @@ app.get('/', (req, res) => {
   });
 });
 
-// Routes with specific rate limiters
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/reservations', reservationRoutes);
@@ -84,19 +75,16 @@ app.use('/api/venues', venueRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/admin/queues', queueRoutes);
 
-// Health check (no rate limit)
 app.get('/health', (req, res) => {
   logger.info('Health check performed');
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// 404 handler (catch-all for undefined routes)
 app.use((req, res) => {
   logger.warn(`Route not found: ${req.method} ${req.originalUrl}`);
   res.status(404).json({ message: 'Route not found' });
 });
 
-// Error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   logger.error(`Error: ${err.message}`);
   logger.error(err.stack || '');

@@ -23,7 +23,6 @@ export class PaymentController {
 
       logger.info(`Initiating M-Pesa payment for reservation ${reservationId}, user ${userId}`);
 
-      // Find reservation
       const reservation = await reservationRepository.findOne({
         where: { id: reservationId, userId },
         relations: ['seat', 'seat.event']
@@ -39,7 +38,6 @@ export class PaymentController {
         return res.status(400).json({ message: 'Reservation already processed' });
       }
 
-      // Format phone number (remove 0, add 254)
       let formattedPhone = phoneNumber.replace(/\D/g, '');
       if (formattedPhone.startsWith('0')) {
         formattedPhone = '254' + formattedPhone.substring(1);
@@ -49,7 +47,6 @@ export class PaymentController {
       
       logger.info(`Initiating STK Push for ${formattedPhone}, amount ${amount}`);
       
-      // Initiate STK Push
       const mpesaResponse = await stkPush(
         formattedPhone,
         amount,
@@ -58,7 +55,6 @@ export class PaymentController {
       );
 
       if (mpesaResponse.ResponseCode === '0') {
-        // Create payment record
         const payment = new Payment();
         payment.userId = userId;
         payment.reservationId = reservationId;
@@ -102,7 +98,6 @@ export class PaymentController {
         
         logger.info(`Callback for Checkout ID: ${CheckoutRequestID}, ResultCode: ${ResultCode}`);
         
-        // Find payment
         const payment = await paymentRepository.findOne({
           where: { mpesaCheckoutId: CheckoutRequestID },
           relations: ['reservation', 'reservation.seat', 'reservation.seat.event']
@@ -110,10 +105,8 @@ export class PaymentController {
         
         if (payment) {
           if (ResultCode === 0) {
-            // Payment successful
             payment.status = PaymentStatus.COMPLETED;
             
-            // Extract receipt number from metadata
             if (CallbackMetadata && CallbackMetadata.Item) {
               const receiptItem = CallbackMetadata.Item.find((item: any) => item.Name === 'MpesaReceiptNumber');
               if (receiptItem) {
@@ -125,7 +118,6 @@ export class PaymentController {
             await paymentRepository.save(payment);
             logger.info(`Payment ${payment.id} completed successfully`);
             
-            // Update reservation
             const reservation = payment.reservation;
             if (reservation) {
               reservation.status = ReservationStatus.CONFIRMED;
@@ -133,7 +125,6 @@ export class PaymentController {
               logger.info(`Reservation ${reservation.id} confirmed`);
             }
             
-            // Update seat
             const seat = reservation?.seat;
             if (seat) {
               seat.status = SeatStatus.BOOKED;
@@ -141,7 +132,6 @@ export class PaymentController {
               logger.info(`Seat ${seat.id} (${seat.seatNumber}) booked`);
             }
             
-            // Generate ticket
             const ticket = new Ticket();
             ticket.ticketCode = uuidv4();
             ticket.userId = payment.userId;
@@ -154,13 +144,11 @@ export class PaymentController {
             await ticketRepository.save(ticket);
             logger.info(`Ticket generated: ${ticket.ticketCode}`);
             
-            // Generate QR code for ticket
             const qrCodeDataUrl = await QRCodeService.generateQRCode(ticket);
             ticket.qrCode = qrCodeDataUrl;
             await ticketRepository.save(ticket);
             logger.info(`QR Code generated for ticket ${ticket.ticketCode}`);
             
-            // Add ONLY ticket processing job to queue (this will trigger the email)
             await ticketQueue.add('ticket', {
               ticketId: ticket.id,
               userId: payment.userId,
@@ -168,9 +156,6 @@ export class PaymentController {
               ticketCode: ticket.ticketCode,
             });
             logger.info(`Ticket job queued for ticket ${ticket.ticketCode}`);
-            
-            // REMOVED duplicate email sends - ticket worker handles email
-            // No separate emailQueue.add calls here
             
           } else {
             payment.status = PaymentStatus.FAILED;

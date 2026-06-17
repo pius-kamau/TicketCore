@@ -5,8 +5,7 @@ dotenv.config();
 
 const redisUrl = process.env.REDIS_URL;
 
-// Create dummy queues if Redis is not available
-const createDummyQueue = () => ({
+const dummyQueue = () => ({
   add: async () => ({ id: 'dummy' }),
   process: () => {},
   on: () => {},
@@ -26,15 +25,12 @@ let notificationQueue: any;
 
 if (redisUrl) {
   try {
-    // BullMQ uses ioredis, which needs TLS config
     const queueOptions = {
       redis: {
         host: 'perfect-haddock-122987.upstash.io',
         port: 6379,
         password: 'gQAAAAAAAeBrAAIgcDEyNjQxMmYxNzZlYWE0ODYyOTBmMDExOWE5MzNjNjJmMA',
-        tls: {
-          rejectUnauthorized: false,
-        },
+        tls: { rejectUnauthorized: false },
       },
       defaultJobOptions: {
         attempts: 3,
@@ -56,20 +52,20 @@ if (redisUrl) {
     ticketQueue = new Queue('ticket-queue', queueOptions);
     notificationQueue = new Queue('notification-queue', queueOptions);
 
-    console.log(' BullMQ queues initialized with Upstash Redis (TLS)');
+    console.log('BullMQ queues initialized');
   } catch (error) {
-    console.log(' BullMQ initialization failed, using dummy queues');
-    emailQueue = createDummyQueue();
-    reservationExpiryQueue = createDummyQueue();
-    ticketQueue = createDummyQueue();
-    notificationQueue = createDummyQueue();
+    console.log('BullMQ initialization failed, using dummy queues');
+    emailQueue = dummyQueue();
+    reservationExpiryQueue = dummyQueue();
+    ticketQueue = dummyQueue();
+    notificationQueue = dummyQueue();
   }
 } else {
-  emailQueue = createDummyQueue();
-  reservationExpiryQueue = createDummyQueue();
-  ticketQueue = createDummyQueue();
-  notificationQueue = createDummyQueue();
-  console.log(' BullMQ running in dummy mode (no Redis)');
+  emailQueue = dummyQueue();
+  reservationExpiryQueue = dummyQueue();
+  ticketQueue = dummyQueue();
+  notificationQueue = dummyQueue();
+  console.log('BullMQ running in dummy mode');
 }
 
 export {

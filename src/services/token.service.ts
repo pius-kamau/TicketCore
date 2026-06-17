@@ -8,12 +8,10 @@ import logger from '../utils/logger';
 const refreshTokenRepository = AppDataSource.getRepository(RefreshToken);
 const userRepository = AppDataSource.getRepository(User);
 
-// Token expiry times
-const ACCESS_TOKEN_EXPIRY = '15m'; // 15 minutes
-const REFRESH_TOKEN_EXPIRY_DAYS = 7; // 7 days
+const ACCESS_TOKEN_EXPIRY = '15m';
+const REFRESH_TOKEN_EXPIRY_DAYS = 7;
 
 export class TokenService {
-  // Generate access token
   static generateAccessToken(user: User): string {
     const jwtSecret = process.env.JWT_SECRET || 'secret';
     return jwt.sign(
@@ -23,15 +21,12 @@ export class TokenService {
     );
   }
 
-  // Generate refresh token and save to database
   static async generateRefreshToken(user: User, ipAddress?: string, userAgent?: string): Promise<RefreshToken> {
-    // Revoke all existing refresh tokens for this user (optional - one active session)
     await refreshTokenRepository.update(
       { userId: user.id, isRevoked: false },
       { isRevoked: true, revokedAt: new Date() }
     );
 
-    // Create new refresh token
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + REFRESH_TOKEN_EXPIRY_DAYS);
 
@@ -48,7 +43,6 @@ export class TokenService {
     return refreshToken;
   }
 
-  // Verify refresh token
   static async verifyRefreshToken(token: string): Promise<{ valid: boolean; userId?: number; message?: string }> {
     const refreshToken = await refreshTokenRepository.findOne({
       where: { token, isRevoked: false },
@@ -66,7 +60,6 @@ export class TokenService {
     return { valid: true, userId: refreshToken.userId };
   }
 
-  // Revoke refresh token (logout)
   static async revokeRefreshToken(token: string): Promise<boolean> {
     const refreshToken = await refreshTokenRepository.findOne({
       where: { token, isRevoked: false }
@@ -84,7 +77,6 @@ export class TokenService {
     return true;
   }
 
-  // Revoke all user tokens (logout from all devices)
   static async revokeAllUserTokens(userId: number): Promise<number> {
     const result = await refreshTokenRepository.update(
       { userId, isRevoked: false },
@@ -95,7 +87,6 @@ export class TokenService {
     return result.affected || 0;
   }
 
-  // Clean up expired tokens (run as a scheduled job)
   static async cleanupExpiredTokens(): Promise<number> {
     const result = await refreshTokenRepository.delete({
       expiresAt: new Date()
@@ -105,7 +96,6 @@ export class TokenService {
     return result.affected || 0;
   }
 
-  // Get user from refresh token
   static async getUserFromRefreshToken(token: string): Promise<User | null> {
     const refreshToken = await refreshTokenRepository.findOne({
       where: { token, isRevoked: false },

@@ -19,18 +19,15 @@ const eventRepository = AppDataSource.getRepository(Event);
 const SEAT_LOCK_DURATION = parseInt(process.env.SEAT_LOCK_DURATION_SECONDS || '600');
 
 export class ReservationController {
-  // Hold a seat (temporary reservation)
   static async holdSeat(req: any, res: Response) {
     try {
       const { eventId, seatId } = req.body;
       const userId = req.userId;
 
-      // Check Redis connection
       if (!redisClient.isOpen) {
         return res.status(503).json({ message: 'Redis service unavailable' });
       }
 
-      // Check if seat exists and is available
       const seat = await seatRepository.findOne({
         where: { id: seatId, eventId }
       });
@@ -43,7 +40,6 @@ export class ReservationController {
         return res.status(400).json({ message: `Seat is already ${seat.status}` });
       }
 
-      // Check Redis for existing lock
       const lockKey = `seat_lock:${eventId}:${seatId}`;
       const existingLock = await redisClient.get(lockKey);
 
@@ -51,7 +47,6 @@ export class ReservationController {
         return res.status(400).json({ message: 'Seat is currently held by another user' });
       }
 
-      // Create reservation in database
       const expiresAt = new Date();
       expiresAt.setSeconds(expiresAt.getSeconds() + SEAT_LOCK_DURATION);
 
@@ -64,14 +59,11 @@ export class ReservationController {
 
       await reservationRepository.save(reservation);
 
-      // Update seat status to HELD
       seat.status = SeatStatus.HELD;
       await seatRepository.save(seat);
 
-      // Store lock in Redis with TTL
       await redisClient.setEx(lockKey, SEAT_LOCK_DURATION, reservation.id.toString());
 
-      // Add reservation expiry job to BullMQ queue (10 minutes delay)
       await reservationExpiryQueue.add('expire', {
         reservationId: reservation.id,
         seatId: seat.id,
@@ -81,7 +73,6 @@ export class ReservationController {
 
       logger.info(`Reservation ${reservation.id} created. Expiry job queued`);
 
-      // Broadcast real-time seat update to all connected clients
       broadcastSeatUpdate(eventId, {
         eventId: eventId,
         seatId: seat.id,
@@ -101,13 +92,11 @@ export class ReservationController {
     }
   }
 
-  // Confirm booking and generate ticket
   static async confirmBooking(req: any, res: Response) {
     try {
       const { reservationId } = req.body;
       const userId = req.userId;
 
-      // Find reservation
       const reservation = await reservationRepository.findOne({
         where: { id: reservationId, userId },
         relations: ['seat', 'seat.event']
@@ -125,16 +114,13 @@ export class ReservationController {
         return res.status(400).json({ message: 'Reservation has expired' });
       }
 
-      // Update reservation status
       reservation.status = ReservationStatus.CONFIRMED;
       await reservationRepository.save(reservation);
 
-      // Update seat status to BOOKED
       const seat = reservation.seat;
       seat.status = SeatStatus.BOOKED;
       await seatRepository.save(seat);
 
-      // Generate ticket
       const ticketCode = uuidv4();
       const ticket = ticketRepository.create({
         ticketCode,
@@ -148,17 +134,14 @@ export class ReservationController {
 
       await ticketRepository.save(ticket);
 
-      // Generate QR code for ticket
       const qrCodeDataUrl = await QRCodeService.generateQRCode(ticket);
       ticket.qrCode = qrCodeDataUrl;
       await ticketRepository.save(ticket);
       logger.info(`QR Code generated for ticket ${ticketCode}`);
 
-      // Remove Redis lock
       const lockKey = `seat_lock:${seat.eventId}:${seat.id}`;
       await redisClient.del(lockKey);
 
-      // Add ticket processing job to queue (for email, etc.)
       await ticketQueue.add('ticket', {
         ticketId: ticket.id,
         userId: userId,
@@ -168,7 +151,6 @@ export class ReservationController {
 
       logger.info(`Ticket ${ticketCode} generated. Ticket job queued`);
 
-      // Broadcast real-time seat update to all connected clients
       broadcastSeatUpdate(seat.eventId, {
         eventId: seat.eventId,
         seatId: seat.id,
@@ -194,7 +176,6 @@ export class ReservationController {
     }
   }
 
-  // Get user's reservations
   static async getUserReservations(req: any, res: Response) {
     try {
       const userId = req.userId;
@@ -211,7 +192,6 @@ export class ReservationController {
     }
   }
 
-  // Get user's tickets
   static async getUserTickets(req: any, res: Response) {
     try {
       const userId = req.userId;
@@ -239,7 +219,6 @@ export class ReservationController {
     }
   }
 
-  // Cancel reservation (release seat)
   static async cancelReservation(req: any, res: Response) {
     try {
       const { reservationId } = req.params;
@@ -258,20 +237,16 @@ export class ReservationController {
         return res.status(400).json({ message: `Cannot cancel ${reservation.status} reservation` });
       }
 
-      // Update reservation status
       reservation.status = ReservationStatus.CANCELLED;
       await reservationRepository.save(reservation);
 
-      // Release seat
       const seat = reservation.seat;
       seat.status = SeatStatus.AVAILABLE;
       await seatRepository.save(seat);
 
-      // Remove Redis lock
       const lockKey = `seat_lock:${seat.eventId}:${seat.id}`;
       await redisClient.del(lockKey);
 
-      // Broadcast real-time seat update to all connected clients
       broadcastSeatUpdate(seat.eventId, {
         eventId: seat.eventId,
         seatId: seat.id,

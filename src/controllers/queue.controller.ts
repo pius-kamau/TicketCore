@@ -3,7 +3,6 @@ import { emailQueue, reservationExpiryQueue, ticketQueue, notificationQueue } fr
 import logger from '../utils/logger';
 
 export class QueueController {
-  // Get queue status (Admin only)
   static async getQueueStatus(req: Request, res: Response) {
     try {
       const queues = {
@@ -34,7 +33,6 @@ export class QueueController {
     }
   }
   
-  // Retry failed jobs (Admin only)
   static async retryFailedJobs(req: Request, res: Response) {
     try {
       const { queueName } = req.params;

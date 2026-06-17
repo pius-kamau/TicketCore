@@ -1,5 +1,4 @@
-﻿# Stage 1: Build
-FROM node:18-alpine AS builder
+﻿FROM node:18-alpine AS builder
 
 WORKDIR /app
 
@@ -9,7 +8,6 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-# Stage 2: Production
 FROM node:18-alpine
 
 WORKDIR /app
@@ -17,7 +15,6 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --only=production
 
-# Copy built files from builder stage
 COPY --from=builder /app/dist ./dist
 
 EXPOSE 3000

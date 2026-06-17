@@ -4,7 +4,7 @@ const options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'TicketCore API Documentation',
+      title: 'TicketCore API',
       version: '1.0.0',
       description: 'Real-time reservation and ticket booking system with M-Pesa integration',
       contact: {
@@ -33,7 +33,7 @@ const options = {
       },
     ],
   },
-  apis: ['./src/routes/*.ts', './src/models/*.ts'], // Path to the API docs
+  apis: ['./src/routes/*.ts', './src/models/*.ts'],
 };
 
 export const swaggerSpec = swaggerJsdoc(options);

@@ -35,12 +35,10 @@ export const processTicketJob = async (job: Job) => {
   return { success: true };
 };
 
-// Register processor only once
 ticketQueue.process('ticket', async (job: Job) => {
   return processTicketJob(job);
 });
 
-// Event listeners with proper types
 ticketQueue.on('completed', (job: Job) => {
   logger.info(`Ticket job ${job.id} completed`);
 });

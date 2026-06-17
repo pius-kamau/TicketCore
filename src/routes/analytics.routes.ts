@@ -4,7 +4,6 @@ import { authenticate, isAdmin } from '../middlewares/auth.middleware';
 
 const router = Router();
 
-// All analytics routes require admin authentication
 router.use(authenticate, isAdmin);
 
 router.get('/dashboard', AnalyticsController.getDashboardStats);

@@ -8,9 +8,8 @@ const seatRepository = AppDataSource.getRepository(Seat);
 
 export async function cleanupExpiredReservations() {
   try {
-    console.log(' Running expired reservations cleanup...');
+    console.log('Running expired reservations cleanup...');
     
-    // Find all expired pending reservations
     const expiredReservations = await reservationRepository
       .createQueryBuilder('reservation')
       .where('reservation.status = :status', { status: ReservationStatus.PENDING })
@@ -18,18 +17,16 @@ export async function cleanupExpiredReservations() {
       .getMany();
 
     if (expiredReservations.length === 0) {
-      console.log(' No expired reservations found');
+      console.log('No expired reservations found');
       return;
     }
 
     console.log(`Found ${expiredReservations.length} expired reservations`);
 
     for (const reservation of expiredReservations) {
-      // Update reservation status
       reservation.status = ReservationStatus.EXPIRED;
       await reservationRepository.save(reservation);
 
-      // Release the seat back to available
       const seat = await seatRepository.findOne({
         where: { id: reservation.seatId }
       });
@@ -39,26 +36,21 @@ export async function cleanupExpiredReservations() {
         await seatRepository.save(seat);
       }
 
-      // Remove Redis lock if Redis is connected
       if (redisClient.isOpen) {
         const lockKey = `seat_lock:${seat?.eventId}:${seat?.id}`;
         await redisClient.del(lockKey);
       }
     }
 
-    console.log(` Cleaned up ${expiredReservations.length} expired reservations`);
+    console.log(`Cleaned up ${expiredReservations.length} expired reservations`);
   } catch (error) {
-    console.error(' Error cleaning up expired reservations:', error);
+    console.error('Error cleaning up expired reservations:', error);
   }
 }
 
-// Run cleanup every minute
 export function startCleanupJob() {
-  console.log(' Starting cleanup job (runs every minute)');
+  console.log('Starting cleanup job (runs every minute)');
   
-  // Run immediately on start
   cleanupExpiredReservations();
-  
-  // Then run every minute
-  setInterval(cleanupExpiredReservations, 60000); // 60 seconds
+  setInterval(cleanupExpiredReservations, 60000);
 }

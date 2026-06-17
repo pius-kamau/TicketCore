@@ -34,7 +34,6 @@ export class AuthController {
       await userRepository.save(user);
       logger.info(`User registered successfully: ${email} (ID: ${user.id})`);
 
-      // Add welcome email to queue - use 'welcome' as the job name
       await emailQueue.add('welcome', {
         type: 'welcome',
         data: {
@@ -45,7 +44,6 @@ export class AuthController {
       });
       logger.info(`Welcome email queued for user ${user.id}`);
 
-      // Generate tokens
       const accessToken = TokenService.generateAccessToken(user);
       const refreshToken = await TokenService.generateRefreshToken(
         user,
@@ -88,7 +86,6 @@ export class AuthController {
         return res.status(401).json({ message: 'Invalid credentials' });
       }
 
-      // Generate tokens
       const accessToken = TokenService.generateAccessToken(user);
       const refreshToken = await TokenService.generateRefreshToken(
         user,
@@ -123,31 +120,25 @@ export class AuthController {
         return res.status(400).json({ message: 'Refresh token required' });
       }
 
-      // Verify refresh token
       const verification = await TokenService.verifyRefreshToken(refreshToken);
       
       if (!verification.valid) {
         return res.status(401).json({ message: verification.message || 'Invalid refresh token' });
       }
 
-      // Get user
       const user = await TokenService.getUserFromRefreshToken(refreshToken);
       
       if (!user) {
         return res.status(401).json({ message: 'User not found' });
       }
 
-      // Generate new access token
       const newAccessToken = TokenService.generateAccessToken(user);
-      
-      // Optional: Rotate refresh token (generate new one)
       const newRefreshToken = await TokenService.generateRefreshToken(
         user,
         req.ip,
         req.headers['user-agent']
       );
       
-      // Revoke the old refresh token
       await TokenService.revokeRefreshToken(refreshToken);
 
       logger.info(`Tokens refreshed for user ${user.id}`);

@@ -5,10 +5,8 @@ import logger from '../utils/logger';
 
 const router = Router();
 
-// All queue routes require admin authentication
 router.use(authenticate, isAdmin);
 
-// Get all queue statuses
 router.get('/status', async (req: Request, res: Response) => {
   try {
     const [emailWaiting, emailActive, emailCompleted, emailFailed] = await Promise.all([
@@ -58,7 +56,6 @@ router.get('/status', async (req: Request, res: Response) => {
   }
 });
 
-// Get failed jobs for a specific queue
 router.get('/failed/:queueName', async (req: Request, res: Response) => {
   try {
     const { queueName } = req.params;
@@ -96,7 +93,6 @@ router.get('/failed/:queueName', async (req: Request, res: Response) => {
   }
 });
 
-// Retry a specific failed job
 router.post('/retry/:queueName/:jobId', async (req: Request, res: Response) => {
   try {
     const { queueName, jobId } = req.params;
@@ -130,7 +126,6 @@ router.post('/retry/:queueName/:jobId', async (req: Request, res: Response) => {
   }
 });
 
-// Retry all failed jobs in a queue
 router.post('/retry-all/:queueName', async (req: Request, res: Response) => {
   try {
     const { queueName } = req.params;
@@ -166,7 +161,6 @@ router.post('/retry-all/:queueName', async (req: Request, res: Response) => {
   }
 });
 
-// Clean completed jobs
 router.post('/clean/:queueName', async (req: Request, res: Response) => {
   try {
     const { queueName } = req.params;

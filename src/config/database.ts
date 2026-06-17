@@ -11,15 +11,17 @@ import { RefreshToken } from '../models/RefreshToken';
 
 dotenv.config();
 
+const { DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, NODE_ENV } = process.env;
+
 export const AppDataSource = new DataSource({
   type: 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  username: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
-  database: process.env.DB_NAME || 'ticketcore_db',
-  synchronize: true,  // ✅ FORCE sync to create tables
-  logging: process.env.NODE_ENV === 'development',
+  host: DB_HOST || 'localhost',
+  port: parseInt(DB_PORT || '5432'),
+  username: DB_USER || 'postgres',
+  password: DB_PASSWORD || 'postgres',
+  database: DB_NAME || 'ticketcore_db',
+  synchronize: false,
+  logging: NODE_ENV === 'development',
   entities: [User, Event, Seat, Reservation, Ticket, Payment, Venue, RefreshToken],
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
 });

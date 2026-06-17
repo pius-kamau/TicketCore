@@ -6,10 +6,8 @@ import { mpesaPaymentSchema } from '../validators/reservation.validator';
 
 const router = Router();
 
-// Public callback endpoint (Safaricom calls this)
 router.post('/mpesa-callback', PaymentController.mpesaCallback);
 
-// Protected routes
 router.use(authenticate);
 router.post('/mpesa/initiate', validate(mpesaPaymentSchema), PaymentController.initiateMpesaPayment);
 router.get('/status/:paymentId', PaymentController.checkPaymentStatus);

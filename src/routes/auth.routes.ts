@@ -6,12 +6,10 @@ import { registerSchema, loginSchema } from '../validators/auth.validator';
 
 const router = Router();
 
-// Public routes
 router.post('/register', validate(registerSchema), AuthController.register);
 router.post('/login', validate(loginSchema), AuthController.login);
 router.post('/refresh-token', AuthController.refreshToken);
 
-// Protected routes
 router.post('/logout', authenticate, AuthController.logout);
 router.post('/logout-all', authenticate, AuthController.logoutAllDevices);
 router.get('/profile', authenticate, AuthController.getProfile);

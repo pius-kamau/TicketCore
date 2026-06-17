@@ -8,7 +8,6 @@ const venueRepository = AppDataSource.getRepository(Venue);
 const eventRepository = AppDataSource.getRepository(Event);
 
 export class VenueController {
-  // Get all venues
   static async getAllVenues(req: Request, res: Response) {
     try {
       const venues = await venueRepository.find({
@@ -22,7 +21,6 @@ export class VenueController {
     }
   }
 
-  // Get venue by ID with events
   static async getVenueById(req: Request, res: Response) {
     try {
       const { id } = req.params;
@@ -42,7 +40,6 @@ export class VenueController {
     }
   }
 
-  // Create venue (Admin only)
   static async createVenue(req: Request, res: Response) {
     try {
       const { name, description, address, city, state, zipCode, country, capacity, amenities, seatLayout } = req.body;
@@ -74,7 +71,6 @@ export class VenueController {
     }
   }
 
-  // Update venue (Admin only)
   static async updateVenue(req: Request, res: Response) {
     try {
       const { id } = req.params;
@@ -113,7 +109,6 @@ export class VenueController {
     }
   }
 
-  // Delete venue (Admin only)
   static async deleteVenue(req: Request, res: Response) {
     try {
       const { id } = req.params;
@@ -142,7 +137,6 @@ export class VenueController {
     }
   }
 
-  // Get venue seat layout
   static async getVenueSeatLayout(req: Request, res: Response) {
     try {
       const { id } = req.params;

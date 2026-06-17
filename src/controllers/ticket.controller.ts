@@ -9,7 +9,6 @@ const ticketRepository = AppDataSource.getRepository(Ticket);
 const eventRepository = AppDataSource.getRepository(Event);
 
 export class TicketController {
-  // Get ticket by ID with QR code
   static async getTicket(req: Request, res: Response) {
     try {
       const { id } = req.params;
@@ -46,7 +45,6 @@ export class TicketController {
     }
   }
 
-  // Verify ticket by QR code (scanning)
   static async verifyTicket(req: Request, res: Response) {
     try {
       const { ticketCode } = req.params;
@@ -70,7 +68,6 @@ export class TicketController {
         });
       }
 
-      // Check if event has already passed
       if (ticket.event && new Date(ticket.event.date) < new Date()) {
         return res.status(400).json({ 
           valid: false, 
@@ -96,7 +93,6 @@ export class TicketController {
     }
   }
 
-  // Check-in ticket (mark as used)
   static async checkInTicket(req: Request, res: Response) {
     try {
       const { ticketCode } = req.params;
@@ -121,7 +117,6 @@ export class TicketController {
         });
       }
 
-      // Check if event has already passed
       if (ticket.event && new Date(ticket.event.date) < new Date()) {
         return res.status(400).json({ 
           success: false, 
@@ -129,7 +124,6 @@ export class TicketController {
         });
       }
 
-      // Mark as used
       ticket.isUsed = true;
       ticket.checkedInAt = new Date();
       ticket.checkedInBy = scannerId;
@@ -153,7 +147,6 @@ export class TicketController {
     }
   }
 
-  // Get all tickets for an event (Admin only)
   static async getEventTickets(req: Request, res: Response) {
     try {
       const { eventId } = req.params;
@@ -190,7 +183,6 @@ export class TicketController {
     }
   }
 
-  // Download QR code for ticket
   static async downloadQRCode(req: Request, res: Response) {
     try {
       const { id } = req.params;

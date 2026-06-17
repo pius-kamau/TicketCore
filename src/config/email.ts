@@ -6,15 +6,14 @@ dotenv.config();
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
 const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
 
-// Email templates
 export const emailTemplates = {
   welcome: (name: string) => ({
-    subject: 'Welcome to TicketCore! 🎫',
+    subject: 'Welcome to TicketCore!',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
         <h2 style="color: #667eea;">Welcome to TicketCore!</h2>
         <p>Hi <strong>${name}</strong>,</p>
-        <p>Thank you for joining TicketCore. You can now book tickets for amazing events!</p>
+        <p>Thank you for joining TicketCore. You can now book tickets for amazing events.</p>
         <p>Get started by browsing our events and booking your favorite seats.</p>
         <hr style="margin: 20px 0; border: none; border-top: 1px solid #e2e8f0;">
         <p style="font-size: 11px; color: #999; text-align: center;">&copy; 2026 TicketCore. All rights reserved.</p>
@@ -26,7 +25,7 @@ export const emailTemplates = {
     const qrCodeUrl = `${appUrl}/api/tickets/qrcode/${ticketCode}`;
 
     return {
-      subject: `🎫 Your Ticket for ${eventName}`,
+      subject: `Your Ticket for ${eventName}`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -54,7 +53,7 @@ export const emailTemplates = {
           </div>
           
           <hr style="margin: 20px 0; border: none; border-top: 1px solid #e2e8f0;">
-          <p style="font-size: 11px; color: #999; text-align: center;">TicketCore • Real-time Booking System</p>
+          <p style="font-size: 11px; color: #999; text-align: center;">TicketCore - Real-time Booking System</p>
         </body>
         </html>
       `,
@@ -65,17 +64,16 @@ export const emailTemplates = {
 export const sendEmail = async (to: string, subject: string, html: string) => {
   try {
     if (!BREVO_API_KEY) {
-      console.log('⚠️ Brevo API key not configured');
+      console.log('Brevo API key not configured');
       return { success: false, error: 'API key missing' };
     }
 
     const response = await axios.post(
       BREVO_API_URL,
       {
-        // In the sendEmail function, change the sender:
         sender: {
           name: 'TicketCore',
-          email: 'pitechtechnologies@gmail.com'  // Your verified Gmail
+          email: 'pitechtechnologies@gmail.com'
         },
         to: [{ email: to }],
         subject: subject,
@@ -90,10 +88,10 @@ export const sendEmail = async (to: string, subject: string, html: string) => {
       }
     );
 
-    console.log(`✅ Email sent to ${to}`);
+    console.log(`Email sent to ${to}`);
     return { success: true, messageId: response.data.messageId };
   } catch (error: any) {
-    console.error(`❌ Email failed to ${to}:`, error.response?.data || error.message);
+    console.error(`Email failed to ${to}:`, error.response?.data || error.message);
     return { success: false, error };
   }
 };

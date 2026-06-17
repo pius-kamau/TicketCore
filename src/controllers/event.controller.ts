@@ -10,7 +10,6 @@ const venueRepository = AppDataSource.getRepository(Venue);
 const seatRepository = AppDataSource.getRepository(Seat);
 
 export class EventController {
-  // Get all events
   static async getAllEvents(req: Request, res: Response) {
     try {
       const events = await eventRepository.find({
@@ -25,7 +24,6 @@ export class EventController {
     }
   }
 
-  // Get event by ID with seats
   static async getEventById(req: Request, res: Response) {
     try {
       const { id } = req.params;
@@ -39,7 +37,6 @@ export class EventController {
         return res.status(404).json({ message: 'Event not found' });
       }
 
-      // Get seat statistics
       const allSeats = await seatRepository.find({
         where: { eventId: parseInt(id) }
       });
@@ -69,7 +66,6 @@ export class EventController {
     }
   }
 
-  // Get full seat layout for an event (grouped by row and section)
   static async getSeatLayout(req: Request, res: Response) {
     try {
       const { id } = req.params;
@@ -79,7 +75,6 @@ export class EventController {
         order: { rowIndex: 'ASC', column: 'ASC', seatNumber: 'ASC' }
       });
 
-      // Group seats by section, then by row
       const layout: any = {};
       
       seats.forEach(seat => {
@@ -117,7 +112,6 @@ export class EventController {
     }
   }
 
-  // Get seats as a matrix (grid) for visualization
   static async getSeatMatrix(req: Request, res: Response) {
     try {
       const { id } = req.params;
@@ -136,11 +130,9 @@ export class EventController {
         });
       }
 
-      // Get max rows and columns
       const maxRow = Math.max(...seats.map(s => s.rowIndex || 0), 0);
       const maxCol = Math.max(...seats.map(s => s.column || 0), 0);
       
-      // Create matrix
       const matrix: any[][] = [];
       for (let i = 0; i <= maxRow; i++) {
         matrix[i] = [];
@@ -149,7 +141,6 @@ export class EventController {
         }
       }
       
-      // Fill matrix
       seats.forEach(seat => {
         const rowIdx = seat.rowIndex || 0;
         const colIdx = seat.column || 0;
@@ -176,17 +167,14 @@ export class EventController {
     }
   }
 
-  // Create event (Admin only)
   static async createEvent(req: Request, res: Response) {
     try {
       const { title, description, venueId, date, price, totalSeats, rows, columns, sections } = req.body;
 
-      // Validate required fields
       if (!title || !date || !price) {
         return res.status(400).json({ message: 'Missing required fields: title, date, price' });
       }
 
-      // Verify venue exists if venueId is provided
       let venueName: string | null = null;
       if (venueId) {
         const venue = await venueRepository.findOne({ where: { id: venueId } });
@@ -196,7 +184,6 @@ export class EventController {
         venueName = venue.name;
       }
 
-      // Create event
       const event = eventRepository.create({
         title,
         description: description || '',
@@ -208,12 +195,10 @@ export class EventController {
 
       await eventRepository.save(event);
 
-      // Create seats with layout
       const seats = [];
       const numRows = rows || 1;
       const numCols = columns || totalSeats || 50;
       
-      // Create grid layout
       for (let rowIdx = 0; rowIdx < numRows; rowIdx++) {
         const rowLetter = String.fromCharCode(65 + rowIdx);
         for (let col = 1; col <= numCols; col++) {
@@ -245,7 +230,6 @@ export class EventController {
     }
   }
 
-  // Update event (Admin only)
   static async updateEvent(req: Request, res: Response) {
     try {
       const { id } = req.params;
@@ -259,7 +243,6 @@ export class EventController {
         return res.status(404).json({ message: 'Event not found' });
       }
 
-      // Update venue if changed
       if (venueId !== undefined && venueId !== event.venueId) {
         if (venueId === null || venueId === 0) {
           event.venueId = null;
@@ -293,7 +276,6 @@ export class EventController {
     }
   }
 
-  // Delete event (Admin only)
   static async deleteEvent(req: Request, res: Response) {
     try {
       const { id } = req.params;
@@ -305,7 +287,6 @@ export class EventController {
         return res.status(404).json({ message: 'Event not found' });
       }
 
-      // Check if there are any confirmed bookings
       const bookedSeats = await seatRepository.count({
         where: { eventId: event.id, status: SeatStatus.BOOKED }
       });
@@ -316,9 +297,7 @@ export class EventController {
         });
       }
 
-      // Delete associated seats first
       await seatRepository.delete({ eventId: event.id });
-      
       await eventRepository.remove(event);
       logger.info(`Event deleted: ${event.title} (ID: ${event.id})`);
 

@@ -20,17 +20,14 @@ export const processReservationExpiry = async (job: Job) => {
   });
   
   if (reservation && reservation.status === ReservationStatus.PENDING) {
-    // Mark as expired
     reservation.status = ReservationStatus.EXPIRED;
     await reservationRepo.save(reservation);
     
-    // Release the seat
     if (reservation.seat) {
       reservation.seat.status = SeatStatus.AVAILABLE;
       await seatRepo.save(reservation.seat);
     }
     
-    // Remove Redis lock
     const lockKey = `seat_lock:${eventId}:${seatId}`;
     await redisClient.del(lockKey);
     
@@ -42,12 +39,10 @@ export const processReservationExpiry = async (job: Job) => {
   return { success: true };
 };
 
-// Register processor only once
 reservationExpiryQueue.process('expire', async (job: Job) => {
   return processReservationExpiry(job);
 });
 
-// Event listeners with proper types
 reservationExpiryQueue.on('completed', (job: Job) => {
   logger.info(`Reservation expiry job ${job.id} completed`);
 });

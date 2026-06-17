@@ -33,7 +33,7 @@ export const processEmailJob = async (job: Job) => {
         <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
           <h2 style="color: #667eea;">Welcome to TicketCore!</h2>
           <p>Hi <strong>${user.name}</strong>,</p>
-          <p>Thank you for joining TicketCore. You can now book tickets for amazing events!</p>
+          <p>Thank you for joining TicketCore. You can now book tickets for amazing events.</p>
           <p>Get started by browsing our events and booking your favorite seats.</p>
           <div style="text-align: center; margin: 20px 0;">
             <a href="${appUrl}" style="background: #667eea; color: white; padding: 10px 20px; text-decoration: none; border-radius: 8px;">Browse Events</a>
@@ -83,7 +83,6 @@ export const processEmailJob = async (job: Job) => {
   return { success: false, error: 'No email content generated' };
 };
 
-// Register processors - make sure these match the job names exactly
 emailQueue.process('welcome', async (job: Job) => {
   logger.info(`Processing welcome job ${job.id}`);
   return processEmailJob(job);
@@ -94,13 +93,11 @@ emailQueue.process('ticket-confirmation', async (job: Job) => {
   return processEmailJob(job);
 });
 
-// Fallback processor for any job without a specific handler
 emailQueue.process(async (job: Job) => {
   logger.info(`Processing generic email job ${job.id} of type ${job.data.type}`);
   return processEmailJob(job);
 });
 
-// Event listeners
 emailQueue.on('completed', (job: Job) => {
   logger.info(`Email job ${job.id} completed`);
 });
