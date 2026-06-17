@@ -24,7 +24,7 @@ export const emailTemplates = {
 
   ticketConfirmation: async (name: string, eventName: string, seatNumber: string, date: Date, ticketCode: string, venueName?: string, appUrl?: string) => {
     const qrCodeUrl = `${appUrl}/api/tickets/qrcode/${ticketCode}`;
-    
+
     return {
       subject: `🎫 Your Ticket for ${eventName}`,
       html: `
@@ -72,9 +72,10 @@ export const sendEmail = async (to: string, subject: string, html: string) => {
     const response = await axios.post(
       BREVO_API_URL,
       {
-        sender: { 
-          name: 'TicketCore', 
-          email: process.env.EMAIL_FROM || 'noreply@ticketcore.com' 
+        // In the sendEmail function, change the sender:
+        sender: {
+          name: 'TicketCore',
+          email: 'pitechtechnologies@gmail.com'  // Your verified Gmail
         },
         to: [{ email: to }],
         subject: subject,
