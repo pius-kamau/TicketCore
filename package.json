@@ -13,6 +13,7 @@
     "migrate:generate": "typeorm migration:generate"
   },
   "dependencies": {
+    "@sendgrid/mail": "^8.1.6",
     "axios": "^1.18.0",
     "bcryptjs": "^2.4.3",
     "bull": "^4.16.5",
