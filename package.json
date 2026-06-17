@@ -13,6 +13,7 @@
     "migrate:generate": "typeorm migration:generate"
   },
   "dependencies": {
+    "@getbrevo/brevo": "^5.0.4",
     "axios": "^1.18.0",
     "bcryptjs": "^2.4.3",
     "bull": "^4.16.5",

@@ -1,41 +1,10 @@
-import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
+import axios from 'axios';
 
 dotenv.config();
 
-// Email configuration - optimized for Render
-const emailConfig = {
-  host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.EMAIL_PORT || '587'),
-  secure: false, // Use STARTTLS
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-  // These settings help with Render's network
-  tls: {
-    ciphers: 'SSLv3',
-    rejectUnauthorized: false,
-  },
-  connectionTimeout: 30000,
-  greetingTimeout: 30000,
-  socketTimeout: 30000,
-  // Use IPv4 only
-  family: 4,
-};
-
-export const transporter = nodemailer.createTransport(emailConfig);
-
-export const verifyEmailConnection = async () => {
-  try {
-    await transporter.verify();
-    console.log('✅ Email service ready');
-    return true;
-  } catch (error) {
-    console.error('❌ Email service error:', error);
-    return false;
-  }
-};
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
+const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
 
 // Email templates
 export const emailTemplates = {
@@ -95,16 +64,35 @@ export const emailTemplates = {
 
 export const sendEmail = async (to: string, subject: string, html: string) => {
   try {
-    const info = await transporter.sendMail({
-      from: process.env.EMAIL_FROM || '"TicketCore" <noreply@ticketcore.com>',
-      to,
-      subject,
-      html,
-    });
+    if (!BREVO_API_KEY) {
+      console.log('⚠️ Brevo API key not configured');
+      return { success: false, error: 'API key missing' };
+    }
+
+    const response = await axios.post(
+      BREVO_API_URL,
+      {
+        sender: { 
+          name: 'TicketCore', 
+          email: process.env.EMAIL_FROM || 'noreply@ticketcore.com' 
+        },
+        to: [{ email: to }],
+        subject: subject,
+        htmlContent: html,
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': BREVO_API_KEY,
+        },
+        timeout: 30000,
+      }
+    );
+
     console.log(`✅ Email sent to ${to}`);
-    return { success: true, messageId: info.messageId };
-  } catch (error) {
-    console.error(`❌ Email failed to ${to}:`, error);
+    return { success: true, messageId: response.data.messageId };
+  } catch (error: any) {
+    console.error(`❌ Email failed to ${to}:`, error.response?.data || error.message);
     return { success: false, error };
   }
 };
