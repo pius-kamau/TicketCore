@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { authenticate, isAdmin } from '../middlewares/auth.middleware';
 import { emailQueue, reservationExpiryQueue, ticketQueue } from '../config/queue';
 import logger from '../utils/logger';
@@ -9,7 +9,7 @@ const router = Router();
 router.use(authenticate, isAdmin);
 
 // Get all queue statuses
-router.get('/status', async (req, res) => {
+router.get('/status', async (req: Request, res: Response) => {
   try {
     const [emailWaiting, emailActive, emailCompleted, emailFailed] = await Promise.all([
       emailQueue.getWaitingCount(),
@@ -59,7 +59,7 @@ router.get('/status', async (req, res) => {
 });
 
 // Get failed jobs for a specific queue
-router.get('/failed/:queueName', async (req, res) => {
+router.get('/failed/:queueName', async (req: Request, res: Response) => {
   try {
     const { queueName } = req.params;
     let failedJobs = [];
@@ -81,7 +81,7 @@ router.get('/failed/:queueName', async (req, res) => {
     res.json({
       queue: queueName,
       count: failedJobs.length,
-      jobs: failedJobs.map(job => ({
+      jobs: failedJobs.map((job: any) => ({
         id: job.id,
         data: job.data,
         failedReason: job.failedReason,
@@ -97,7 +97,7 @@ router.get('/failed/:queueName', async (req, res) => {
 });
 
 // Retry a specific failed job
-router.post('/retry/:queueName/:jobId', async (req, res) => {
+router.post('/retry/:queueName/:jobId', async (req: Request, res: Response) => {
   try {
     const { queueName, jobId } = req.params;
     let job;
@@ -131,7 +131,7 @@ router.post('/retry/:queueName/:jobId', async (req, res) => {
 });
 
 // Retry all failed jobs in a queue
-router.post('/retry-all/:queueName', async (req, res) => {
+router.post('/retry-all/:queueName', async (req: Request, res: Response) => {
   try {
     const { queueName } = req.params;
     let failedJobs = [];
@@ -166,8 +166,8 @@ router.post('/retry-all/:queueName', async (req, res) => {
   }
 });
 
-// Clean completed jobs (returns number of jobs cleaned, not the jobs array)
-router.post('/clean/:queueName', async (req, res) => {
+// Clean completed jobs
+router.post('/clean/:queueName', async (req: Request, res: Response) => {
   try {
     const { queueName } = req.params;
     let cleanedJobs: any[] = [];
