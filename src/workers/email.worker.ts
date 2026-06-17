@@ -28,8 +28,20 @@ export const processEmailJob = async (job: Job) => {
 
   switch (type) {
     case 'welcome':
-      subject = emailTemplates.welcome(user.name).subject;
-      html = emailTemplates.welcome(user.name).html;
+      subject = `Welcome to TicketCore, ${user.name}! 🎫`;
+      html = `
+        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #667eea;">Welcome to TicketCore!</h2>
+          <p>Hi <strong>${user.name}</strong>,</p>
+          <p>Thank you for joining TicketCore. You can now book tickets for amazing events!</p>
+          <p>Get started by browsing our events and booking your favorite seats.</p>
+          <div style="text-align: center; margin: 20px 0;">
+            <a href="${appUrl}/events" style="background: #667eea; color: white; padding: 10px 20px; text-decoration: none; border-radius: 8px;">Browse Events</a>
+          </div>
+          <hr style="margin: 20px 0; border: none; border-top: 1px solid #e2e8f0;">
+          <p style="font-size: 11px; color: #999; text-align: center;">&copy; 2026 TicketCore. All rights reserved.</p>
+        </div>
+      `;
       logger.info(`Preparing welcome email for ${user.email}`);
       break;
 

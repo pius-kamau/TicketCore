@@ -20,6 +20,9 @@ dotenv.config();
 
 const app = express();
 
+// ✅ Trust proxy for rate limiting behind Render/nginx
+app.set('trust proxy', 1);
+
 // Logging middleware (first!)
 app.use(httpLogger);
 
@@ -52,7 +55,7 @@ app.use(express.static(path.join(__dirname, '../public')));
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 logger.info('Swagger documentation available at /api-docs');
 
-// ✅ Welcome route at root
+// Welcome route at root
 app.get('/', (req, res) => {
   res.json({
     message: 'Welcome to TicketCore API',
